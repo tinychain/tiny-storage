@@ -22,11 +22,13 @@ In blockchain project, we met some demands that can improve the performance of b
 Alice created a music and wants to sell it through blockchain network. She deploys(or use) a smart contract, which allows buyers to upload their public keys and call the file demand as an order. Then Alice uses these public keys from buyers to encrypt the music file, uploads it to the IPFS, and transfers the content hash to the smart contract. The contract will automatically check the content hash and verify its corresponding file's existence in network. If pass, contract will transfer the token from buyers to Alice's account.
 
 ### Scenario 2: Copyright Protection
-Alice created a music and wants to declare her copyright. She uploads the file to private IPFS network provided by blockchain, and signs the content hash IPFS returned. Also Alice deploys(or use) a smart contract, and send the signature, content hash of her work, her public key, and **the current timestamp** to the contract. Other people will find the content hash and its signature with earliest timestamp, **verify it with the a list of public key that belongs to different copyright declarers**, and find out which declarer is the real one.
+Alice created a music and wants to declare her copyright. She uploads the file to private IPFS network provided by blockchain, and signs the content hash IPFS returned. Also Alice deploys(or use) a smart contract, and send the signature, content hash of her work, her public key, and **the current timestamp** to the contract. Other people will find the content hash and its signature with earliest timestamp, **verify it with the a list of public key that belongs to different copyright declarers**, and find out which declarer is the  one holding the copyright.
 
 ### Scenario 3: Temporary Oracle Event Data
 
-### Scenario 4: Play with IOT(Internet of Things)
+
+### Scenario 4: IOT(Internet of Things)
+The sensors play important role in IOT. They collect the data from outside, compute with given algorithms, and send the results back. When we combine IOT with blockchain, we have to consider the size of dataset sensors collect. If the specific data of one sensor is just stored in that, it's very easy losing, because a sensor is not a reliable device. So it's the better way to upload them to the IPFS network, provided by thousands of sensors around the area. At the same time, we can retrieve the data we need from every sensor at low cost.
 
 ## Features
 TODO...
