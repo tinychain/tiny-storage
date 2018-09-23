@@ -31,5 +31,12 @@ A contract calls the demand of data from reality throught off-chain event. It ca
 The sensors play an important role in IOT. They collect the data from outside, compute with given algorithms, and send the results back. When we combine IOT with blockchain, we have to consider the size of dataset sensors collect. If the specific data of one sensor is just stored in that, it's very easy losing, because a sensor is not a reliable device. If we upload all the data sensors hold to a centralized storage, it's a huge dataset and the risk of hack attack arises. So it's a better way to upload them to the IPFS network, provided by thousands of sensors around the area. At the same time, we can retrieve the data we need from every sensor at low cost.
 
 ## Features
-TODO...
+TinyStorage provides several necessary capabilities for blockchain
+- read and write data with IPFS.
+- verify the data existness in IPFS.
+- expose interface and interact with smart contract.
+
+For more details, please read [design](https://github.com/Tinychain/TinyStorage/blob/master/design.md).
+
+
   
