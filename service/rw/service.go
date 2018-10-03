@@ -1,15 +1,27 @@
 package rw
 
 import (
-	"github.com/tinychain/tinychain/p2p/pb"
+	"errors"
+	"io/ioutil"
+	"strings"
+	"sync/atomic"
+
+	"github.com/ipfs/go-ipfs-api"
+	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/libp2p/go-libp2p-peer"
 	"github.com/op/go-logging"
-	"github.com/tinychain/tinychain/common"
 	"github.com/tinychain/tiny-storage/types"
-	"time"
+	"github.com/tinychain/tinychain/common"
+	bcTypes "github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/core/vm/evm/abi"
+	"github.com/tinychain/tinychain/event"
+	"github.com/tinychain/tinychain/p2p"
+	"github.com/tinychain/tinychain/p2p/pb"
 )
 
 var (
+	errPrivKeyNotFound = errors.New("private key should be provided")
+
 	rwServiceMsg = "storage.rw"
 )
 
@@ -20,21 +32,128 @@ var (
 //
 // Before using RWService, the `rw_manager` contract should be deployed in blockchain.
 type RWService struct {
-	log            *logging.Logger
-	collectTimeout time.Duration // timeout for collecting copy message at a round
+	log          *logging.Logger
+	conf         *Config
+	privKey      crypto.PrivKey // private key used to sign proof fetching transaction
+	contractAddr common.Address // address of pre-deploy contract `storage_rw.solc`
+
+	api     types.TransactionAPI // transaction api provided by blockchain
+	ipfs    shell.Shell          // ipfs shell handler, **there should be an ipfs daemon starting in local system**
+	event   *event.TypeMux
+	address atomic.Value
 }
 
-func NewRWService() *RWService {
-	rw := &RWService{
-		log: common.GetLogger("storage_rw_service"),
+func NewRWService(config *common.Config, api types.TransactionAPI, privKey crypto.PrivKey) *RWService {
+	conf, err := newConfig(config)
+	if err != nil {
+		return nil
 	}
+	rw := &RWService{
+		log:     common.GetLogger("storage_rw_service"),
+		conf:    conf,
+		api:     api,
+		privKey: privKey,
+		event:   event.GetEventhub(),
+	}
+
+	return rw
+}
+
+func (rw *RWService) Addr() common.Address {
+	if addr := rw.address.Load(); addr != nil {
+		return addr.(common.Address)
+	}
+	addr, err := common.GenAddrByPrivkey(rw.privKey)
+	if err != nil {
+		return common.Address{}
+	}
+	rw.address.Store(addr)
+	return addr
+}
+
+func (rw *RWService) PrivKey() crypto.PrivKey {
+	return rw.conf.privKey
 }
 
 // process handles copy message from other peers.
-func (rw *RWService) process(copyMsg *types.CopyMessage) error {
-	// Verify sign list
+func (rw *RWService) Process(copyMsg *types.CopyMessage) error {
+	// Check there is private key or not
+	if rw.PrivKey() == nil {
+		// Only relay the copy message
+		data, err := copyMsg.Serialize()
+		if err != nil {
+			rw.log.Errorf("encode copyMsg failed when only relay, %s", err)
+			return err
+		}
+		go rw.event.Post(&p2p.MulticastNeighborEvent{
+			Typ:   rwServiceMsg,
+			Data:  data,
+			Count: copyMsg.Peers,
+		})
+		return nil
+	}
+	// Verify proof from contracts `storage_rw.solc` which has deployed in blockchain
+	payload, err := rw.pack("getProof", copyMsg.ProofId)
+	if err != nil {
+		rw.log.Errorf("pack function and params to payload failed, %s", err)
+		return err
+	}
+
+	tx := bcTypes.NewTransaction(0, 0, 0, nil, payload, rw.Addr(), rw.contractAddr)
+	ret, err := rw.api.Call(tx)
+	if err != nil {
+		rw.log.Errorf("error occurs when calling contract, %s", err)
+		return err
+	}
+
+	proof := &types.Proof{}
+	if err := proof.Deserialize(ret); err != nil {
+		rw.log.Errorf("decode proof from bytes failed, %s", err)
+		return err
+	}
+
+	// Verify copy message with proof
+	if err := copyMsg.Verify(proof); err != nil {
+		rw.log.Errorf("copy message is not valid, %s", err)
+		return err
+	}
+
+	// Check is there copy in local
+	if _, err := rw.GetFromLocal(proof.Cid); err == nil {
+		// File exists in local storage
+		rw.log.Infof("data with cid %s exists in local storage", proof.Cid)
+		return nil
+	}
+
+	// Fetch data from IPFS
+	if _, err := rw.GetFromIPFS(proof.Cid); err != nil {
+		rw.log.Errorf("fetch data from IPFS failed, %s", err)
+		return err
+	}
+
+	// Verify info in fileDesc with real data from IPFS
+	if err := rw.VerifyWithIPFS(copyMsg.FileDesc); err != nil {
+		rw.log.Errorf("fileDesc invalid and mismatch with real data from IPFS, %s", err)
+		rw.DeleteData(proof.Cid)
+		return err
+	}
+
+	return nil
 }
 
+func (rw *RWService) pack(fn string, args ...interface{}) ([]byte, error) {
+	jsonData, err := ioutil.ReadFile("./contracts/storage_rw.abi")
+	if err != nil {
+		return nil, err
+	}
+	abi, err := abi.JSON(strings.NewReader(string(jsonData)))
+	if err != nil {
+		return nil, err
+	}
+	return abi.Pack(fn, args)
+}
+
+// Run implements `protocol` interface provided by blockchain as network servcie.
 func (rw *RWService) Run(pid peer.ID, message *pb.Message) error {
 	data := message.Data
 	copyMsg := &types.CopyMessage{}
@@ -43,13 +162,15 @@ func (rw *RWService) Run(pid peer.ID, message *pb.Message) error {
 		return err
 	}
 
-	return rw.process(copyMsg)
+	return rw.Process(copyMsg)
 }
 
+// Type implements `protocol` interface provided by blockchain as network servcie.
 func (rw *RWService) Type() string {
 	return rwServiceMsg
 }
 
+// Error implements `protocol` interface provided by blockchain as network servcie.
 func (rw *RWService) Error(err error) {
 	rw.log.Error(err)
 }
