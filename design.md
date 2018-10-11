@@ -53,9 +53,9 @@ The process of writing data is asynchronous as below:
 3. When verification passes, `Onode` add data to IPFS(operated by nodes in blockchain). And then the node multicast a message `m=<copy,proof,n-1,signs,src_peer>` to n-1 neighbors.
 4. When a certain node receive the message, it kicks off a countdown to collect enough messages with the same proof id. After the countdown offs, the node will choose the message with the same proof id and the longest signs list(`k=len(signs)`), which means **transferred farthest**, and verify signatures in signs list. If pass, process four steps as below:
 	1. Get proof details from blockchain with proof id.
-	2. Fetch data from IPFS with `cid`. A timeout is necessary. If retrieves data, sign `<copy>`, append the signature and public key to the signs list, and multicast `m=<copy,proof,n-k,signs,src_peer>` to other n-k neighbors.If n - k = 0, do nothing.
-	3. Verify the actual size with proof details.
-	4. If passes, **response success message to src\_peer**.
+	2. Fetch data from IPFS with `cid`. A timeout is necessary. After retrieves data, verify the actual size and storing expires with proof details.
+	3. If verification passes, sign `<copy>`, append the signature and public key to the signs list, and multicast `m=<copy,proof,n-k,signs,src_peer>` to other n-k neighbors. Otherwise, do nothing. If n - k = 0, do nothing. 
+	4. At the same time, **response success message to src\_peer**.
 5. Users are allowed to retrieve the amount of replica peers with a given cid from `Onode` at any time.
 
 ![](images/read&write.png)
