@@ -17,6 +17,19 @@ var (
 	errDataNotFound = errors.New("data not found")
 )
 
+// AddDataToIPFS add data with a given path to IPFS network.
+func (rw *RWService) AddDataToIPFS(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	cid, err := rw.ipfs.Add(file)
+	if err != nil {
+		return "", err
+	}
+	return cid, nil
+}
+
 // Fetch fetches data from IPFS, and save in local directory.
 // If timeout reaches, it's treated as data not found.
 func (rw *RWService) GetFromIPFS(cid string) (os.FileInfo, error) {
@@ -49,7 +62,7 @@ func (rw *RWService) GetFromIPFS(cid string) (os.FileInfo, error) {
 // Get returns the file name of data with given cid. If not exist in local,
 // the node will retrieves data from IPFS, and save in local directory.
 func (rw *RWService) GetFromLocal(cid string) (os.FileInfo, error) {
-	fname := path.Join(dataDir, storePrefix+cid)
+	fname := path.Join(dataDir, rw.constructPrefix(cid))
 	file, err := os.Open(fname)
 	if err == nil {
 		fi, err := file.Stat()
@@ -63,7 +76,7 @@ func (rw *RWService) GetFromLocal(cid string) (os.FileInfo, error) {
 }
 
 func (rw *RWService) DeleteData(cid string) error {
-	fname := path.Join(dataDir, storePrefix+cid)
+	fname := path.Join(dataDir, rw.constructPrefix(cid))
 	if err := os.Remove(fname); err != nil {
 		return err
 	}
@@ -102,4 +115,8 @@ func (rw *RWService) VerifyWithIPFS(fd *types.FileDesc) error {
 func (rw *RWService) checkTimeout(createTime time.Time, duration time.Duration) bool {
 	diff := time.Now().Sub(createTime)
 	return diff >= duration
+}
+
+func (rw *RWService) constructPrefix(cid string) string {
+	return storePrefix + cid
 }

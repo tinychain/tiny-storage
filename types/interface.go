@@ -8,4 +8,5 @@ type TransactionAPI interface {
 	Call(tx *types.Transaction) ([]byte, error)
 }
 
-
+type ChainAPI interface {
+}

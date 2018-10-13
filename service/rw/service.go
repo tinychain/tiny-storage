@@ -114,13 +114,15 @@ func (rw *RWService) process(copyMsg *types.CopyMessage) error {
 		})
 		return nil
 	}
-	// Verify proof from contracts `storage_rw.solc` which has deployed in blockchain
+
+	// Verify proof from contracts `storage_rw.solc` which has deployed in blockchain.
 	payload, err := rw.pack("getProof", copyMsg.ProofId)
 	if err != nil {
 		rw.log.Errorf("pack function and params to payload failed, %s", err)
 		return err
 	}
 
+	// Package new transaction with payload.
 	tx := bcTypes.NewTransaction(0, 0, 0, nil, payload, rw.Addr(), rw.contractAddr)
 	ret, err := rw.api.Call(tx)
 	if err != nil {
@@ -190,6 +192,7 @@ func (rw *RWService) verifyAndFetch(copyMsg *types.CopyMessage, proof *types.Pro
 	return nil
 }
 
+// startCollect starts to collect copy messages from other peers in a certain time.
 func (rw *RWService) startCollect(copyMsg *types.CopyMessage, proof *types.Proof) error {
 	msgMap := rw.msgCache[copyMsg.ID()]
 	if msgMap == nil {
@@ -244,6 +247,7 @@ func (rw *RWService) pickBestCopy(cid string) *types.CopyMessage {
 	return tmsg
 }
 
+// pack encodes contract function and args to a hex bytes.
 func (rw *RWService) pack(fn string, args ...interface{}) ([]byte, error) {
 	jsonData, err := ioutil.ReadFile("./contracts/storage_rw.abi")
 	if err != nil {
