@@ -32,11 +32,11 @@ We defined a structure called `Data Possesion Description`(`copy` for short):
 ##### Data writing
 At data writing protocol, we define message as `m = <copy,proof,n,signs,src_peer>`:
 
-- copy - data possesion description
-- proof - id of proof stored in smart contracts
-- n - the number of remote peers should be transferred
-- src\_peer - pid of the original source peer (namely the peer broadcasting message first)
-- signs - list of signatures. If a peer accept the message, it will sign and append the signature and public key to the list. Each entry includes two elements:
+- `copy` - data possesion description
+- `proof` - id of proof stored in smart contracts
+- `n` - the number of remote peers should be transferred
+- `src_peer` - pid of the original source peer (namely the peer broadcasting message first)
+- `signs` - list of signatures. If a peer accept the message, it will sign and append the signature and public key to the list. Each entry includes two elements:
 	- pk - publick key
 	- sign - signature
 
